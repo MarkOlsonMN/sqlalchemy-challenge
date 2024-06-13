@@ -69,19 +69,124 @@ def calculate_one_year_earlier(most_recent_date_string):
     
 #################################################
 
-def pull_precipitation_data():
+def find_one_year_prior_to_most_recent_measurement_data():
 
-    # Find the most recent date in the data set.
+    # Find the most recent date in the measuremnet data set.
     most_recent_date_row = session.query(
         measurement.date
     ).order_by(
         measurement.date.desc()
     ).first()
     
-    print(f"The most recent date in the data set: {most_recent_date_row.date}")
+    print(f"The most recent date in the measurement data set: {most_recent_date_row.date}")
     
-    # Calculate the date one year from the last date in data set.
+    # Calculate a date one year prior
     one_year_earlier_date_string = calculate_one_year_earlier(most_recent_date_row.date)
+
+    print(f"One year earlier: {one_year_earlier_date_string}")
+
+    return one_year_earlier_date_string
+
+#################################################
+
+def pull_min_max_avg_tobs_data(start_date, end_date=None):
+
+    if end_date is not None:
+        print("Found End Date")
+    else:
+        print("No End Date")
+
+    return ("")
+    
+#################################################
+
+def pull_tobs_data():
+
+    # Design a query to find the most active stations (i.e. which stations have the most rows?)
+    # List the stations and their counts in descending order.
+    station_activity = session.query(
+        measurement.station, func.count(measurement.station)
+    ).group_by(
+        measurement.station
+    ).order_by(
+        func.count(measurement.station).desc()
+    ).all()
+    
+    print("Station and Activity Counts (by Descending Activity Order):\n{station_activity}")
+
+    # Using the most active station id from the previous query, calculate the lowest, highest, and average temperature.
+    most_active_station_id = station_activity[0][0]
+
+    print(f"Most Active Station: {most_active_station_id}")
+    
+
+    one_year_earlier_date_string = find_one_year_prior_to_most_recent_measurement_data()
+
+    tobs = session.query(
+        measurement
+    ).filter(
+        measurement.station == most_active_station_id
+    ).filter(
+        measurement.date >= one_year_earlier_date_string
+    ).all()
+
+    # Display the type of the measurements variable
+    print(f"tobs type: {type(tobs)}")
+    # Display the number of results
+    print(f"tobs results: {len(tobs)}")
+
+    # Convert SQLAlchemy result to JSON
+    tobs_data = [
+        { 'id': measurement.id, 'station': measurement.station, 'tobs': measurement.tobs, 'prcp': measurement.prcp, 'date': measurement.date }
+        for measurement in tobs
+    ]
+
+    # Display the type of the measurements variable
+    print(f"tobs_data type: {type(tobs_data)}")
+    # Display the number of results
+    print(f"tobs_data results: {len(tobs_data)}")
+    
+    return tobs_data
+
+#################################################
+    
+def pull_stations_data():
+
+    stations = session.query(
+        station
+    ).all()
+    
+    # Convert SQLAlchemy result to JSON
+    stations_data = [
+        { 'id': station.id, 'station': station.station, 'name': station.name, 'latitude': station.latitude, 'longitude': station.longitude, 'elevation': station.elevation }
+        for station in stations
+    ]
+
+    # Display the type of the measurements variable
+    print(f"stations_data type: {type(stations_data)}")
+    # Display the number of results
+    print(f"stations_data results: {len(stations_data)}")
+    
+    return stations_data
+
+#################################################
+
+def pull_precipitation_data():
+    
+    # # Find the most recent date in the data set.
+    # most_recent_date_row = session.query(
+    #     measurement.date
+    # ).order_by(
+    #     measurement.date.desc()
+    # ).first()
+    
+    # print(f"The most recent date in the data set: {most_recent_date_row.date}")
+    
+    # # Calculate the date one year from the last date in data set.
+    # one_year_earlier_date_string = calculate_one_year_earlier(most_recent_date_row.date)
+
+    one_year_earlier_date_string = find_one_year_prior_to_most_recent_measurement_data()
+
     
     # Perform a query to retrieve the data and precipitation scores
     measurements = session.query(
@@ -306,7 +411,7 @@ def api_precipitation():
 
     # Display the type of the measurements variable
     print(f"pulled_data type: {type(pulled_data)}")
-    # # Display the number of results
+    # Display the number of results
     print(f"pulled_data results: {len(pulled_data)}")
     
     response_data = {
@@ -318,25 +423,50 @@ def api_precipitation():
 # Define what to do when a user hits the /jsonified route
 @app.route("/api/v1.0/stations")
 def api_stations():
+    pulled_data = pull_stations_data()
+    
+    # Display the type of the measurements variable
+    print(f"pulled_data type: {type(pulled_data)}")
+    # Display the number of results
+    print(f"pulled_data results: {len(pulled_data)}")
+
     response_data = {
-        "message": "Hello from /api/v1.0/stations"
+        "message": "Hello from /api/v1.0/stations",
+        "data": pulled_data
     }
     return jsonify(response_data), 200
 
 # Define what to do when a user hits the /jsonified route
 @app.route("/api/v1.0/tobs")
 def api_tobs():
+    pulled_data = pull_tobs_data()
+
+    # Display the type of the measurements variable
+    print(f"pulled_data type: {type(pulled_data)}")
+    # Display the number of results
+    print(f"pulled_data results: {len(pulled_data)}")
+    
     response_data = {
-        "message": "Hello from /api/v1.0/tobs"
+        "message": "Hello from /api/v1.0/tobs",
+        "data": pulled_data
     }
     return jsonify(response_data), 200
 
 # Define what to do when a user hits the /jsonified route
 @app.route("/api/v1.0/<start>")
 def api_start(start):
+
+    pulled_data = pull_min_max_avg_tobs_data(start)
+
+    # Display the type of the measurements variable
+    print(f"pulled_data type: {type(pulled_data)}")
+    # Display the number of results
+    print(f"pulled_data results: {len(pulled_data)}")
+    
     response_data = {
         "message": "Hello from /api/v1.0/<start>",
-        "start": start
+        "start": start,
+        "data": pulled_data
     }
     return jsonify(response_data), 200
 
@@ -344,19 +474,36 @@ def api_start(start):
 @app.route("/api/v1.0/<start>/<end>")
 def api_start_end(start, end):
 
-    if (True):
-        response_data = {
-            "message": "Hello from /api/v1.0/<start>/<end>",
-            "start": start,
-            "end": end
-        }
-        return jsonify(response_data), 200
-    else:
-        error_message = "YOU_DID_IT_WRONG"
-        error_response = {
-            "error": f"Request terminated due to an unfortunate occurance of an {error_message} error."
-        }
-        return jsonify(error_response), 404
+    pulled_data = pull_min_max_avg_tobs_data(start, end)
+
+    # Display the type of the measurements variable
+    print(f"pulled_data type: {type(pulled_data)}")
+    # Display the number of results
+    print(f"pulled_data results: {len(pulled_data)}")
+
+    response_data = {
+        "message": "Hello from /api/v1.0/<start>/<end>",
+        "start": start,
+        "end": end,
+        "data": pulled_data
+    }
+    return jsonify(response_data), 200
+    
+#################################################
+
+    # if (True):
+    #     response_data = {
+    #         "message": "Hello from /api/v1.0/<start>/<end>",
+    #         "start": start,
+    #         "end": end
+    #     }
+    #     return jsonify(response_data), 200
+    # else:
+    #     error_message = "YOU_DID_IT_WRONG"
+    #     error_response = {
+    #         "error": f"Request terminated due to an unfortunate occurance of an {error_message} error."
+    #     }
+    #     return jsonify(error_response), 404
 
 #################################################
 
