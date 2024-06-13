@@ -6,9 +6,34 @@
 # Class: U of M Data Analytics and Visualization Boot Camp , Spring 2024
 # Student: Mark Olson
 # Professor: Thomas Bogue , Assisted by Jordan Tompkins
-# Date: 06/13/2024
+# Date: 06/10/2024
 #
 
+
+#
+# Good Positive URL Testing Results:
+# -----------------------------------
+# 127.0.0.1 - - [13/Jun/2024 04:41:16] "GET / HTTP/1.1" 200 -
+# 127.0.0.1 - - [13/Jun/2024 04:41:27] "GET /api/v1.0/precipitation HTTP/1.1" 200 -
+# 127.0.0.1 - - [13/Jun/2024 04:41:30] "GET /api/v1.0/stations HTTP/1.1" 200 -
+# 127.0.0.1 - - [13/Jun/2024 04:41:33] "GET /api/v1.0/tobs HTTP/1.1" 200 -
+# 127.0.0.1 - - [13/Jun/2024 04:41:38] "GET /api/v1.0/2016-01-01 HTTP/1.1" 200 -
+# 127.0.0.1 - - [13/Jun/2024 04:41:42] "GET /api/v1.0/2016-01-01/2017-01-01 HTTP/1.1" 200 -
+# 127.0.0.1 - - [13/Jun/2024 04:41:46] "GET /api/v1.0/2016-08-23 HTTP/1.1" 200 -
+# 127.0.0.1 - - [13/Jun/2024 04:41:50] "GET /api/v1.0/2016-08-23/2017-08-23 HTTP/1.1" 200 -
+#
+# Good Negative URL Testing Results:
+# -----------------------------------
+# 127.0.0.1 - - [13/Jun/2024 04:42:21] "GET /whatnot HTTP/1.1" 404 -
+# 127.0.0.1 - - [13/Jun/2024 04:42:27] "GET /api/v1.0 HTTP/1.1" 404 -
+# 127.0.0.1 - - [13/Jun/2024 04:42:35] "GET /api/v1.0/08/23/2016 HTTP/1.1" 404 -
+# 127.0.0.1 - - [13/Jun/2024 04:42:39] "GET /api/v1.0/08-23-2016 HTTP/1.1" 400 -
+# 127.0.0.1 - - [13/Jun/2024 04:42:45] "GET /api/v1.0/2016-08-23/2045-08-23 HTTP/1.1" 400 -
+# 127.0.0.1 - - [13/Jun/2024 04:42:47] "GET /api/v1.0/yesterday/today HTTP/1.1" 400 -
+# 127.0.0.1 - - [13/Jun/2024 04:43:54] "GET /api/v1.0/2017-08-23/2016-08-23 HTTP/1.1" 400 -
+#
+
+               
 #################################################
 # Import the dependencies
 #################################################
@@ -92,12 +117,12 @@ def find_one_year_prior_to_the_most_recent_measurement_data():
         measurement.date.desc()
     ).first()
     
-    print(f"Most Recent Date in the Measurement Data Set: {most_recent_date_row.date}")
+    # print(f"Most Recent Date in the Measurement Data Set: {most_recent_date_row.date}")
     
     # Calculate a date one year prior
     one_year_earlier_date_string = calculate_one_year_earlier(most_recent_date_row.date)
 
-    print(f"One Year Earlier: {one_year_earlier_date_string}")
+    # print(f"One Year Earlier: {one_year_earlier_date_string}")
 
     return one_year_earlier_date_string
 
@@ -118,7 +143,7 @@ def find_most_active_station_id_in_measurement_data():
     
     most_active_station_id = station_activity_row.station
 
-    print(f"Most Active Station Id: {most_active_station_id}")
+    # print(f"Most Active Station Id: {most_active_station_id}")
 
     return most_active_station_id
 
@@ -207,22 +232,12 @@ def pull_tobs_data():
         measurement.date >= one_year_earlier_date_string
     ).all()
 
-    # Display the type of the measurements variable
-    print(f"tobs type: {type(tobs)}")
-    # Display the number of results
-    print(f"tobs results: {len(tobs)}")
-
     # Convert SQLAlchemy result to JSON
     tobs_data = [
         { 'id': measurement.id, 'station': measurement.station, 'tobs': measurement.tobs, 'prcp': measurement.prcp, 'date': measurement.date }
         for measurement in tobs
     ]
 
-    # Display the type of the measurements variable
-    print(f"tobs_data type: {type(tobs_data)}")
-    # Display the number of results
-    print(f"tobs_data results: {len(tobs_data)}")
-    
     return tobs_data
 
 # ----------------------------------------
@@ -239,11 +254,6 @@ def pull_stations_data():
         for station in stations
     ]
 
-    # Display the type of the measurements variable
-    print(f"stations_data type: {type(stations_data)}")
-    # Display the number of results
-    print(f"stations_data results: {len(stations_data)}")
-    
     return stations_data
 
 # ----------------------------------------
@@ -264,18 +274,9 @@ def pull_precipitation_data():
     #       Each tuple represents a row from the database query result,
     #       where the first element is measurement.prcp and the second element is measurement.date.
     #
-    # Display the type of the measurements variable
-    print(f"measurements type: {type(measurements)}")
-    # Display the number of results
-    print(f"measurements results: {len(measurements)}")
 
     # Create a Pandas DataFrame from measurements
     df = pd.DataFrame(measurements, columns=['prcp', 'date'])
-
-    # Display the type of the measurements variable
-    print(f"df type: {type(df)}")
-    # Display the number of results
-    print(f"df results: {len(df)}")
 
     # Initialize a defaultdict with a list
     date_prcp_dict = defaultdict(list)
@@ -284,18 +285,8 @@ def pull_precipitation_data():
     for index, row in df.iterrows():
         date_prcp_dict[row['date']].append(row['prcp'])
 
-    # Display the type of the measurements variable
-    print(f"date_prcp_dict type: {type(date_prcp_dict)}")
-    # Display the number of results
-    print(f"date_prcp_dict results: {len(date_prcp_dict)}")
-
     # convert defaultdict to a regular dictionary
     date_prcp_dict = dict(date_prcp_dict)
-
-    # Display the type of the measurements variable
-    print(f"date_prcp_dict type: {type(date_prcp_dict)}")
-    # Display the number of results
-    print(f"date_prcp_dict results: {len(date_prcp_dict)}")
 
     return date_prcp_dict
 
@@ -377,11 +368,6 @@ def home():
 def api_precipitation():
     pulled_data = pull_precipitation_data()
 
-    # Display the type of the measurements variable
-    print(f"pulled_data type: {type(pulled_data)}")
-    # Display the number of results
-    print(f"pulled_data results: {len(pulled_data)}")
-    
     response_data = {
         "message": "Hello from /api/v1.0/precipitation",
         "data": pulled_data
@@ -396,11 +382,6 @@ def api_precipitation():
 def api_stations():
     pulled_data = pull_stations_data()
     
-    # Display the type of the measurements variable
-    print(f"pulled_data type: {type(pulled_data)}")
-    # Display the number of results
-    print(f"pulled_data results: {len(pulled_data)}")
-
     response_data = {
         "message": "Hello from /api/v1.0/stations",
         "data": pulled_data
@@ -415,11 +396,6 @@ def api_stations():
 def api_tobs():
     pulled_data = pull_tobs_data()
 
-    # Display the type of the measurements variable
-    print(f"pulled_data type: {type(pulled_data)}")
-    # Display the number of results
-    print(f"pulled_data results: {len(pulled_data)}")
-    
     response_data = {
         "message": "Hello from /api/v1.0/tobs",
         "data": pulled_data
@@ -436,11 +412,6 @@ def api_start(start):
     try:
         pulled_data = pull_min_max_avg_tobs_data(start)
 
-        # Display the type of the measurements variable
-        print(f"pulled_data type: {type(pulled_data)}")
-        # Display the number of results
-        print(f"pulled_data results: {len(pulled_data)}")
-        
         response_data = {
             "message": "Hello from /api/v1.0/<start>",
             "start": start,
@@ -471,11 +442,6 @@ def api_start_end(start, end):
     try:
         pulled_data = pull_min_max_avg_tobs_data(start, end)
 
-        # Display the type of the measurements variable
-        print(f"pulled_data type: {type(pulled_data)}")
-        # Display the number of results
-        print(f"pulled_data results: {len(pulled_data)}")
-    
         response_data = {
             "message": "Hello from /api/v1.0/<start>/<end>",
             "start": start,
