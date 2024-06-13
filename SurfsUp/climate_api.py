@@ -93,14 +93,67 @@ def pull_min_max_avg_tobs_data(start_date, end_date=None):
 
     if end_date is not None:
         print("Found End Date")
+        # check_date_format(start_date)
+        # check_date_format(end_date)
+        # check_date_relationship(start_date, end_date)
     else:
         print("No End Date")
+        # check_date_format(start_date)
 
-    return ("")
+    # Start building the query
+    query = session.query(
+        func.min(measurement.tobs).label('min_tobs'),
+        func.max(measurement.tobs).label('max_tobs'),
+        func.avg(measurement.tobs).label('avg_tobs')
+    ).filter(
+        measurement.date >= start_date
+    )
+    
+    # If end_date is provided, add it to the filter
+    if end_date is not None:
+        query = query.filter(
+            measurement.date <= end_date
+        )
+
+    # DEBUG = True
+    # if DEBUG:
+    #     most_active_station_id = find_most_active_station_id_in_measurement_data()
+    #     query = query.filter(
+    #         measurement.station == most_active_station_id
+    #     )
+            
+    # Execute the query and get the result
+    result = query.one()
+    
+    # Return the result as a dictionary
+    return {
+        'min_tobs': result.min_tobs,
+        'max_tobs': result.max_tobs,
+        'avg_tobs': result.avg_tobs
+    }
+
+    # --------------------------------------------------
+
+    # summary_station_activity = session.query(
+    #     func.min(measurement.tobs),
+    #     func.max(measurement.tobs),
+    #     func.avg(measurement.tobs)
+    # ).filter(
+    #     measurement.station == most_active_station_id
+    # ).all()
+    
+    # print( summary_station_activity )
+    # print("")
+    # print(f"Most Active Station: {most_active_station_id}")
+    # print(f"  Lowest  Temperature: {summary_station_activity[0][0]:.2f}")
+    # print(f"  Highest Temperature: {summary_station_activity[0][1]:.2f}")
+    # print(f"  Average Temperature: {summary_station_activity[0][2]:.2f}")
+
+    # return ("")
     
 #################################################
 
-def pull_tobs_data():
+def find_most_active_station_id_in_measurement_data():
 
     # Design a query to find the most active stations (i.e. which stations have the most rows?)
     # List the stations and their counts in descending order.
@@ -112,13 +165,20 @@ def pull_tobs_data():
         func.count(measurement.station).desc()
     ).all()
     
-    print("Station and Activity Counts (by Descending Activity Order):\n{station_activity}")
+    print(f"Station and Activity Counts (by Descending Activity Order):\n{station_activity}")
 
     # Using the most active station id from the previous query, calculate the lowest, highest, and average temperature.
     most_active_station_id = station_activity[0][0]
 
-    print(f"Most Active Station: {most_active_station_id}")
-    
+    print(f"Most Active Station Id: {most_active_station_id}")
+
+    return most_active_station_id
+
+#################################################
+
+def pull_tobs_data():
+   
+    most_active_station_id = find_most_active_station_id_in_measurement_data()
 
     one_year_earlier_date_string = find_one_year_prior_to_most_recent_measurement_data()
 
