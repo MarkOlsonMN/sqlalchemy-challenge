@@ -1,34 +1,48 @@
+#
+# Module 10 Challenge
+#
+# Climate API - A Python Flask SQLAlchemy Web Application
+#
+# Class: U of M Data Analytics and Visualization Boot Camp , Spring 2024
+# Student: Mark Olson
+# Professor: Thomas Bogue , Assisted by Jordan Tompkins
+# Date: 06/13/2024
+#
 
-# Import the dependencies.
+#################################################
+# Import the dependencies
+#################################################
 
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 
-
 # ----------
-# importing request from flask, you ensure that the request object is available
-# within the not_found error handler function,
-# allowing you to access the request.path attribute
-# ----------
-#from flask import Flask, jsonify
+# NOTE: Import "request" from flask, to ensure that the request object is available
+#       within the app.errorhandler "not_found" function,
+#       allowing access to the request.path attribute, to display failed endpoint request
 from flask import Flask, jsonify, request    
 
+import pandas as pd
 
+import datetime as dt
+from dateutil.relativedelta import relativedelta
+
+# ----------
+# NOTE: Used to collect a list of values, associated to a single key
+from collections import defaultdict
+    
 # ----------
 # NOTE: To remedy the following error that I was constantly seeing in my flask debug console ...
 #           " 127.0.0.1 - - [12/Jun/2024 14:54:19] "GET /favicon.ico HTTP/1.1" 404 - "
-#       ... I used MS-Paint to create a 32x32 pixel icon file named "favicon.ico" ...
-#       ... and saved it into a subfolder named "static", from the directory in which this file "climate_api.py" is located
+#       I used MS-Paint to create a 32x32 pixel icon file named "favicon.ico" ...
+#       and saved it into a subfolder named "static", from the directory in which this file "climate_api.py" is located
 
-import pandas as pd
-import datetime as dt
 
 #################################################
 # Database Setup
 #################################################
-
 
 # create engine to hawaii.sqlite
 engine = create_engine("sqlite:///Resources/hawaii.sqlite")
@@ -51,55 +65,107 @@ session = Session(engine)
 
 
 #################################################
+# Functions
+#################################################
 
-from dateutil.relativedelta import relativedelta
-
-def calculate_one_year_earlier(most_recent_date_string):
+def calculate_one_year_earlier(recent_date_string):
         
     # Convert the string date to a datetime object
-    most_recent_date = dt.datetime.strptime(most_recent_date_string, '%Y-%m-%d')
+    recent_date = dt.datetime.strptime(recent_date_string, '%Y-%m-%d')
 
     # Calculate the date one year earlier
-    one_year_earlier_date = most_recent_date - relativedelta(years=1)
+    one_year_earlier_date = recent_date - relativedelta(years=1)
 
     # Convert the date back to a string
     one_year_earlier_date_string = one_year_earlier_date.strftime('%Y-%m-%d')
 
     return one_year_earlier_date_string
     
-#################################################
+# ----------------------------------------
 
-def find_one_year_prior_to_most_recent_measurement_data():
+def find_one_year_prior_to_the_most_recent_measurement_data():
 
-    # Find the most recent date in the measuremnet data set.
+    # Find the most recent date in the measurement data set.
     most_recent_date_row = session.query(
         measurement.date
     ).order_by(
         measurement.date.desc()
     ).first()
     
-    print(f"The most recent date in the measurement data set: {most_recent_date_row.date}")
+    print(f"Most Recent Date in the Measurement Data Set: {most_recent_date_row.date}")
     
     # Calculate a date one year prior
     one_year_earlier_date_string = calculate_one_year_earlier(most_recent_date_row.date)
 
-    print(f"One year earlier: {one_year_earlier_date_string}")
+    print(f"One Year Earlier: {one_year_earlier_date_string}")
 
     return one_year_earlier_date_string
 
-#################################################
+# ----------------------------------------
+
+def find_most_active_station_id_in_measurement_data():
+
+    # find the most active station (i.e. has the most rows)
+    # sort stations and their counts in descending order
+    # grab the first (most active) row
+    station_activity_row = session.query(
+        measurement.station, func.count(measurement.station)
+    ).group_by(
+        measurement.station
+    ).order_by(
+        func.count(measurement.station).desc()
+    ).first()
+    
+    most_active_station_id = station_activity_row.station
+
+    print(f"Most Active Station Id: {most_active_station_id}")
+
+    return most_active_station_id
+
+# ----------------------------------------
+
+def validate_date_parameters(start_date_string, end_date_string=None):
+
+    # Check if start_date_string is a valid date
+    try:
+        start_date = dt.datetime.strptime(start_date_string, '%Y-%m-%d')
+        # print("Found Start Date")
+    except ValueError:
+        raise ValueError(f"start date {start_date_string} is not in the correct format YYYY-MM-DD")
+    
+    # Check if start_date is in the future
+    if start_date > dt.datetime.today():
+        raise ValueError(f"start date {start_date_string} cannot be in the future")
+
+    if end_date_string is not None:
+        # Check if end_date_string is a valid date
+        try:
+            end_date = dt.datetime.strptime(end_date_string, '%Y-%m-%d')
+            # print("Found End Date")
+        except ValueError:
+            raise ValueError(f"end date {end_date_string} is not in the correct format YYYY-MM-DD")
+
+        # Check if end_date is in the future
+        if end_date > dt.datetime.today():
+            raise ValueError(f"end date {end_date_string} cannot be in the future")
+
+        # Check if start_date is prior to end_date
+        if start_date > end_date:
+            raise ValueError(f"start date {start_date_string} must not follow end date {end_date_string}")
+
+        # print("Start Date and End Date are Valid")
+        return True
+        
+    else:
+        # print("Start Date is Valid")
+        return True
+
+# ----------------------------------------
 
 def pull_min_max_avg_tobs_data(start_date, end_date=None):
 
-    if end_date is not None:
-        print("Found End Date")
-        # check_date_format(start_date)
-        # check_date_format(end_date)
-        # check_date_relationship(start_date, end_date)
-    else:
-        print("No End Date")
-        # check_date_format(start_date)
-
+    validate_date_parameters(start_date, end_date)
+    
     # Start building the query
     query = session.query(
         func.min(measurement.tobs).label('min_tobs'),
@@ -115,13 +181,6 @@ def pull_min_max_avg_tobs_data(start_date, end_date=None):
             measurement.date <= end_date
         )
 
-    # DEBUG = True
-    # if DEBUG:
-    #     most_active_station_id = find_most_active_station_id_in_measurement_data()
-    #     query = query.filter(
-    #         measurement.station == most_active_station_id
-    #     )
-            
     # Execute the query and get the result
     result = query.one()
     
@@ -132,55 +191,13 @@ def pull_min_max_avg_tobs_data(start_date, end_date=None):
         'avg_tobs': result.avg_tobs
     }
 
-    # --------------------------------------------------
-
-    # summary_station_activity = session.query(
-    #     func.min(measurement.tobs),
-    #     func.max(measurement.tobs),
-    #     func.avg(measurement.tobs)
-    # ).filter(
-    #     measurement.station == most_active_station_id
-    # ).all()
-    
-    # print( summary_station_activity )
-    # print("")
-    # print(f"Most Active Station: {most_active_station_id}")
-    # print(f"  Lowest  Temperature: {summary_station_activity[0][0]:.2f}")
-    # print(f"  Highest Temperature: {summary_station_activity[0][1]:.2f}")
-    # print(f"  Average Temperature: {summary_station_activity[0][2]:.2f}")
-
-    # return ("")
-    
-#################################################
-
-def find_most_active_station_id_in_measurement_data():
-
-    # Design a query to find the most active stations (i.e. which stations have the most rows?)
-    # List the stations and their counts in descending order.
-    station_activity = session.query(
-        measurement.station, func.count(measurement.station)
-    ).group_by(
-        measurement.station
-    ).order_by(
-        func.count(measurement.station).desc()
-    ).all()
-    
-    print(f"Station and Activity Counts (by Descending Activity Order):\n{station_activity}")
-
-    # Using the most active station id from the previous query, calculate the lowest, highest, and average temperature.
-    most_active_station_id = station_activity[0][0]
-
-    print(f"Most Active Station Id: {most_active_station_id}")
-
-    return most_active_station_id
-
-#################################################
+# ----------------------------------------
 
 def pull_tobs_data():
    
     most_active_station_id = find_most_active_station_id_in_measurement_data()
 
-    one_year_earlier_date_string = find_one_year_prior_to_most_recent_measurement_data()
+    one_year_earlier_date_string = find_one_year_prior_to_the_most_recent_measurement_data()
 
     tobs = session.query(
         measurement
@@ -208,7 +225,7 @@ def pull_tobs_data():
     
     return tobs_data
 
-#################################################
+# ----------------------------------------
     
 def pull_stations_data():
 
@@ -229,24 +246,11 @@ def pull_stations_data():
     
     return stations_data
 
-#################################################
+# ----------------------------------------
 
 def pull_precipitation_data():
     
-    # # Find the most recent date in the data set.
-    # most_recent_date_row = session.query(
-    #     measurement.date
-    # ).order_by(
-    #     measurement.date.desc()
-    # ).first()
-    
-    # print(f"The most recent date in the data set: {most_recent_date_row.date}")
-    
-    # # Calculate the date one year from the last date in data set.
-    # one_year_earlier_date_string = calculate_one_year_earlier(most_recent_date_row.date)
-
-    one_year_earlier_date_string = find_one_year_prior_to_most_recent_measurement_data()
-
+    one_year_earlier_date_string = find_one_year_prior_to_the_most_recent_measurement_data()
     
     # Perform a query to retrieve the data and precipitation scores
     measurements = session.query(
@@ -255,52 +259,15 @@ def pull_precipitation_data():
         measurement.date >= one_year_earlier_date_string
     ).all()
 
-
+    # ----------
+    # NOTE: measurements is a variable that stores a list object containing tuples.
+    #       Each tuple represents a row from the database query result,
+    #       where the first element is measurement.prcp and the second element is measurement.date.
+    #
     # Display the type of the measurements variable
     print(f"measurements type: {type(measurements)}")
-    #
-    # measurements is a variable that stores a list object containing tuples.
-    # Each tuple represents a row from the database query result,
-    # where the first element is measurement.prcp and the second element is measurement.date.
-
     # Display the number of results
     print(f"measurements results: {len(measurements)}")
-
-
-    # # Save the query results as a Pandas DataFrame. Explicitly set the column names
-    # df = pd.DataFrame(measurements, columns=['Precipitation','Date'])
-    
-    # # Sort the dataframe by date
-    # df_sorted = df.sort_values(by='Date', ascending=True)
-
-
-
-    # # # Example measurements list (replace this with your actual list)
-    # # measurements = [
-    # #     (0.08, '2016-08-23'),
-    # #     (0.02, '2016-08-24'),
-    # #     (None, '2016-08-25'),  # Example with None value for precipitation
-    # #     (0.05, '2016-08-26'),
-    # #     (0.0, '2016-08-27')
-    # # ]
-    
-    # # Create an empty dictionary to store the JSON structure
-    # measurements_json = {}
-    
-    # # Iterate through each tuple in measurements
-    # for prcp, date in measurements:
-    #     # Skip tuples where prcp is None (or handle accordingly)
-    #     if prcp is None:
-    #         continue
-    #     # Assign the date as key and precipitation as value in the dictionary
-    #     measurements_json[date] = prcp
-    
-    # # Convert the dictionary to JSON format
-    # measurements_json_str = json.dumps(measurements_json, indent=4)
-    
-    # # Print the JSON string
-    # print(measurements_json_str)
-
 
     # Create a Pandas DataFrame from measurements
     df = pd.DataFrame(measurements, columns=['prcp', 'date'])
@@ -310,49 +277,6 @@ def pull_precipitation_data():
     # Display the number of results
     print(f"df results: {len(df)}")
 
-
-
-
-    
-    # ERR ----------------------------------------
-    # # # Drop rows with NaN values (if any)
-    # # df = df.dropna()
-    
-    # # # Convert DataFrame to JSON format (orient='index' to use 'date' as index/key)
-    # # measurements_json = df.set_index('date')['prcp'].to_json(orient='index', indent=4)
-    # #
-    # # above gave runtime error ... "ValueError: Series index must be unique for orient='index'"
-    # #
-    # # Convert DataFrame to JSON format (orient='index' to use 'date' as index/key)
-    # measurements_json = df.set_index('date')['prcp'].to_json(indent=4)
-    
-    # # Print the JSON string
-    # print(measurements_json)
-
-    # return measurements_json
-    # ERR ----------------------------------------
-
-
-    # ERR / ONLY LAST VALUE FOUND PER KEY IS RETAINED ----------------------------------------
-    # # Set 'date' column as index and convert to dictionary
-    # date_prcp_dict = df.set_index('date')['prcp'].to_dict()
-
-    # # Display the type of the measurements variable
-    # print(f"date_prcp_dict: {type(date_prcp_dict)}")
-    # # Display the number of results
-    # print(f"date_prcp_dict results: {len(date_prcp_dict)}")
-
-    
-    # # Convert dictionary to JSON
-    # date_prcp_json = date_prcp_dict
-    
-    # #print(date_prcp_json)
-    # return date_prcp_json
-    # ERR / ONLY LAST VALUE FOUND PER KEY IS RETAINED ----------------------------------------
-
-
-    from collections import defaultdict
-    
     # Initialize a defaultdict with a list
     date_prcp_dict = defaultdict(list)
     
@@ -365,8 +289,7 @@ def pull_precipitation_data():
     # Display the number of results
     print(f"date_prcp_dict results: {len(date_prcp_dict)}")
 
-
-    # If you want to convert defaultdict to a regular dictionary
+    # convert defaultdict to a regular dictionary
     date_prcp_dict = dict(date_prcp_dict)
 
     # Display the type of the measurements variable
@@ -374,10 +297,6 @@ def pull_precipitation_data():
     # Display the number of results
     print(f"date_prcp_dict results: {len(date_prcp_dict)}")
 
-
-#    print(date_prcp_dict)
-
-    # return date_prcp_json
     return date_prcp_dict
 
 
@@ -393,17 +312,13 @@ app = Flask(__name__)
 # Flask Routes
 #################################################
 
+# ----------
+# NOTE: The key-value pair ordering of the json response, ...
+#       as recieved by a web browser (or curl command) ...
+#       may not appear in the same order as being written here
 
-# @app.errorhandler(404)
-# def not_found(error):
-#     return jsonify({
-#         "error": "The requested resource was not found on the server.",
-#         "invalid_route": request.path
-#     }), 404
 
-# NOTE: the key-value pair ordering of the json response,
-#       ... as recieved by a web browser (or curl command)
-#       ... may not appear in the same order as being written here
+# Define the response to an invalid (undefined) route.
 #
 @app.errorhandler(404)
 def not_found(error):
@@ -417,54 +332,47 @@ def not_found(error):
         }
     }), 404
 
-# NOTE: turns out that the json key-value pair ordering is mixed up anyways,
-#       as displayed from web browser , or a curl command
-#       despite "response_data = OrderedDict" having intended element order
-#       ... so , going back to the non-OrderedDict version of the function
+# ----------------------------------------
+
+# Define the "/" main index route.
 #
-# # NOTE enforces a particular order ( for viewing consistency )
-# #
-# from collections import OrderedDict
-# #
-# @app.errorhandler(404)
-# def not_found(error):
-#     response_data = OrderedDict([
-#         ("error_message", "The requested resource was not found on the server."),
-#         ("invalid_route", request.path),
-#         ("error", {
-#             "code": error.code,
-#             "name": error.name,
-#             "description": error.description
-#         })
-#     ])
-
-#     print( type(response_data) )
-#     print(response_data)
-    
-#     return jsonify(response_data), 404
-    
-
-# Define what to do when a user hits the index route.
 @app.route("/")
 def home():
     return (
         f"Welcome to the Climate API!<br/>"
+        f"<br/>"
         f"Available Routes:<br/>"
+        f"-----------------------<br/>"
+        f"<br/>"
         f"/api/v1.0/precipitation<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;expectation: returns jsonified percipitation data for the last year in the database<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;return data: a dictionary of key-value pairs , where each key is a date , and each value is a list containing one or more precipitation readings that occured on that particular date<br/>"
+        f"<br/>"
         f"/api/v1.0/stations<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;expectation: returns jsonified informational data for all the weather stations in the database<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;return data: a list of dictionaries , where each dictionary contains a number of key-value pairs which describe various aspects of an individual weather station<br/>"
+        f"<br/>"
         f"/api/v1.0/tobs<br/>"
-        #
-        # f"/api/v1.0/<start><br/>"
-        # f"/api/v1.0/<start>/<end>"
-        #
-        # f"/api/v1.0/{{start}}<br/>"
-        # f"/api/v1.0/{{start}}/{{end}}"
-        #
-        f"/api/v1.0/&lt;start&gt;<br/>"   # Use &lt; and &gt; for < and > in HTML
-        f"/api/v1.0/&lt;start&gt;/&lt;end&gt;"
-    )    
+        f"&nbsp;&nbsp;&nbsp;&nbsp;expectation: returns jsonified weather observation data for the most active weather station for the last year in the database<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;return data: a list of dictionaries , where each dictionary contains a number of key-value pairs which describe various aspects of a particular weather observation<br/>"
+        f"<br/>"
+        f"/api/v1.0/&lt;start&gt;<br/>" 
+        f"&nbsp;&nbsp;&nbsp;&nbsp;expectation: returns jsonified min, max, and average temperatures calculated from given start date to end of data in the dataset<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;return data: a dictionary of 3 key-value pairs ... where the 3 keys are min_tobs, max_tobs, avg_tobs ... and their values are the associated aggregate function results<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;parameter: expected start date format is yyyy-mm-dd ... an invalid start date will return an error response 400<br/>"
+        f"<br/>"
+        f"/api/v1.0/&lt;start&gt;/&lt;end&gt;<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;expectation: returns jsonified min, max, and average temperatures calculated from given start date to given end date found within dataset<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;return data: a dictionary of 3 key-value pairs ... where the 3 keys are min_tobs, max_tobs, avg_tobs ... and their values are the associated aggregate function results<br/>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;parameters: expected start and end date format is yyyy-mm-dd ... an invalid start or end date will return an error response 400<br/>"
+        f"<br/>"
+        f"note: invalid routes will return an error response 404<br/>"
+)    
 
-# Define what to do when a user hits the /normal route
+# ----------------------------------------
+
+# Define the "/api/v1.0/precipitation" route
+#
 @app.route("/api/v1.0/precipitation")
 def api_precipitation():
     pulled_data = pull_precipitation_data()
@@ -480,7 +388,10 @@ def api_precipitation():
     }
     return jsonify(response_data), 200
 
-# Define what to do when a user hits the /jsonified route
+# ----------------------------------------
+
+# Define the "/api/v1.0/stations" route
+#
 @app.route("/api/v1.0/stations")
 def api_stations():
     pulled_data = pull_stations_data()
@@ -496,7 +407,10 @@ def api_stations():
     }
     return jsonify(response_data), 200
 
-# Define what to do when a user hits the /jsonified route
+# ----------------------------------------
+
+# Define the "/api/v1.0/tobs" route
+#
 @app.route("/api/v1.0/tobs")
 def api_tobs():
     pulled_data = pull_tobs_data()
@@ -512,58 +426,78 @@ def api_tobs():
     }
     return jsonify(response_data), 200
 
-# Define what to do when a user hits the /jsonified route
+# ----------------------------------------
+
+# Define the parameterized "/api/v1.0/<start>" route
+#
 @app.route("/api/v1.0/<start>")
 def api_start(start):
 
-    pulled_data = pull_min_max_avg_tobs_data(start)
+    try:
+        pulled_data = pull_min_max_avg_tobs_data(start)
 
-    # Display the type of the measurements variable
-    print(f"pulled_data type: {type(pulled_data)}")
-    # Display the number of results
-    print(f"pulled_data results: {len(pulled_data)}")
-    
-    response_data = {
-        "message": "Hello from /api/v1.0/<start>",
-        "start": start,
-        "data": pulled_data
-    }
-    return jsonify(response_data), 200
+        # Display the type of the measurements variable
+        print(f"pulled_data type: {type(pulled_data)}")
+        # Display the number of results
+        print(f"pulled_data results: {len(pulled_data)}")
+        
+        response_data = {
+            "message": "Hello from /api/v1.0/<start>",
+            "start": start,
+            "data": pulled_data
+        }
+        return jsonify(response_data), 200
 
-# Define what to do when a user hits the /jsonified route
+    except ValueError as e:
+        response_data = {
+            "message": "Hello from /api/v1.0/<start>",
+            "start": start,
+            "error": {
+                # "code": e.args[0],       # Assuming ValueError carries an error code
+                "code": 400,
+                "name": type(e).__name__,  # Get the class name of the exception
+                "description": str(e)      # Convert exception to string for description
+            }
+        }
+        return jsonify(response_data), 400
+        
+# ----------------------------------------
+
+# Define the parameterized "/api/v1.0/<start>/<end>" route
+#
 @app.route("/api/v1.0/<start>/<end>")
 def api_start_end(start, end):
 
-    pulled_data = pull_min_max_avg_tobs_data(start, end)
+    try:
+        pulled_data = pull_min_max_avg_tobs_data(start, end)
 
-    # Display the type of the measurements variable
-    print(f"pulled_data type: {type(pulled_data)}")
-    # Display the number of results
-    print(f"pulled_data results: {len(pulled_data)}")
-
-    response_data = {
-        "message": "Hello from /api/v1.0/<start>/<end>",
-        "start": start,
-        "end": end,
-        "data": pulled_data
-    }
-    return jsonify(response_data), 200
+        # Display the type of the measurements variable
+        print(f"pulled_data type: {type(pulled_data)}")
+        # Display the number of results
+        print(f"pulled_data results: {len(pulled_data)}")
     
-#################################################
+        response_data = {
+            "message": "Hello from /api/v1.0/<start>/<end>",
+            "start": start,
+            "end": end,
+            "data": pulled_data
+        }
+        return jsonify(response_data), 200
+    
+    except ValueError as e:
+        response_data = {
+            "message": "Hello from /api/v1.0/<start>/<end>",
+            "start": start,
+            "end": end,
+            "error": {
+                # "code": e.args[0],       # Assuming ValueError carries an error code
+                "code": 400,
+                "name": type(e).__name__,  # Get the class name of the exception
+                "description": str(e)      # Convert exception to string for description
+            }
+        }
+        return jsonify(response_data), 400
 
-    # if (True):
-    #     response_data = {
-    #         "message": "Hello from /api/v1.0/<start>/<end>",
-    #         "start": start,
-    #         "end": end
-    #     }
-    #     return jsonify(response_data), 200
-    # else:
-    #     error_message = "YOU_DID_IT_WRONG"
-    #     error_response = {
-    #         "error": f"Request terminated due to an unfortunate occurance of an {error_message} error."
-    #     }
-    #     return jsonify(error_response), 404
 
 #################################################
 
